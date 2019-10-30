@@ -1,20 +1,22 @@
 {
-  "name": "dltext-parser",
+  "name": "dragatext",
   "version": "1.0.0",
-  "description": "parse drag lost text data",
-  "main": "main.ts",
+  "description": "draga lost text parser",
   "scripts": {
     "tool": "ts-node -P tsconfig.json",
+    "parser": "ts-node -P tsconfig.json ./src/tool/parser.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "chalk": "^2.4.2",
-    "nexline": "^1.1.0"
+    "bson": "4.0.2",
+    "chalk": "2.4.2",
+    "nexline": "1.1.0"
   },
   "devDependencies": {
-    "@types/node": "^12.11.7",
-    "ts-node": "^8.4.1",
-    "typescript": "~3.5.3"
+    "@types/bson": "4.0.0",
+    "@types/node": "12.11.7",
+    "ts-node": "8.4.1",
+    "typescript": "3.5.3"
   },
   "author": "",
   "license": "ISC"

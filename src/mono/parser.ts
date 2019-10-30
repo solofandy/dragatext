@@ -1,114 +1,47 @@
 import chalk from "chalk";
+import { MonoToken, EOP } from "./mono";
 
-const EOP = 'EOP'
+const EXCLUDE_TOKEN = [
+  { mono: /^vector/, key: /^entriesHashCode/ },
+  { mono: /^vector/, key: /^entriesNext/ },
+  { mono: /^vector/, key: /^entriesKey/ },
+  { mono: /^vector/, key: /^buckets/ },
 
-type MonoType = 'object' | 'array' | 'array-index'| 'number' | 'string' | 'null'
+  { mono: /^PPtr</, key: /^GameObject/ },
+  { mono: /^UInt8/, key: /^Enabled/ },
+  { mono: /^PPtr</, key: /^Script/ },
 
-interface MonoProperty {
-  key: string;
-  type: MonoType;
-  typeInMono: string;
-  value: null | string | number | { [name: string]: any } | any[];
-}
+  { mono: /^int</, key: /^freeCount/ },
+  { mono: /^int</, key: /^freeList/ }
+]
 
 export class MonoBehaviour {
-  
-  static getObjectToken(items: string[]) {
-    if (items.length !== 2) {
-      return null
-    }
-    
-    let typeInMono: string = ''
-    let key: string = ''
-    if (items[0].match(/^(MonoBehaviour|PPtr<)/)) {
-      [typeInMono, key] = items
-    }
-    else if (items[1].match(/^(dict|data)/)) {
-      [key, typeInMono] = items
-    }
-    return !key ? null : {
-      type: 'object',
-      value: {},
-      typeInMono,
-      key
-    } as MonoProperty
+
+  private static isExcludeToken(token: MonoToken): boolean {
+    return !!EXCLUDE_TOKEN.find(exclude => {
+      return token.key.match(exclude.key) && token.mono.match(exclude.mono)
+    })
   }
-  
-  static getArrayToken(items: string[]) {
-    if (items.length !== 2) {
-      return null
+
+  private static isEmptyObjectToken(token: MonoToken): boolean {
+    if (token.type !== 'object') {
+      return false
     }
-    
-    let typeInMono: string = ''
-    let key: string = ''
-    if (items[0].match(/^(vector)/)) {
-      [typeInMono, key] = items
+    const value: { [name: string]: MonoToken } = token.value as { [name: string]: MonoToken }
+    for (const key in value) {
+      if (!!value[key] && !!value[key].value) {
+        return false
+      }
     }
-    else if (items[1].match(/^(list|entriesValue)/)) {
-      [key, typeInMono] = items
-    }
-    return !key ? null : {
-      type: 'array',
-      value: [],
-      typeInMono,
-      key
-    } as MonoProperty
+    return true
   }
-  
-  static getArrayIndexToken(items: string[]) {
-    if (items.length !== 1) {
-      return null
-    }
-    
-    if (items[0].match(/^(\[\d+\])/)) {
-      return {
-        type: 'array-index',
-        value: items[0].replace(/\[|\]/g, ''),
-        typeInMono: '',
-        key: ''
-      } as MonoProperty
-    }
-    else {
-      return null
-    }
+
+  private static normalizeKey(key: string): string {
+    return key.replace(/^m?_/, '')
   }
-  
-  // SInt64 m_PathID = -7917755486195054967
-  static getPropertyToken(items: string[]) {
-    if (items.length !== 4 || items[2] !== '=') {
-      return null
-    }
-  
-    if (items[0].match(/^(string)/)) {
-      return {
-        type: 'string',
-        key: items[1],
-        typeInMono: items[0],
-        value: items[3].replace(/(^")|("$)/g, '')
-      } as MonoProperty
-    }
-    else if (items[0].match(/^(int|UInt8|SInt64)/)) {
-      return {
-        type: 'number',
-        key: items[1],
-        typeInMono: items[0],
-        value: parseInt(items[3], 10)
-      } as MonoProperty
-    }
-    else if (items[0].match(/^(float)/)) {
-      return {
-        type: 'number',
-        key: items[1],
-        typeInMono: items[0],
-        value: parseFloat(items[3])
-      } as MonoProperty
-    }
-    else {
-      return null
-    }
-  }
-  
-  static async parse(reader: any, tabs: number, overread: any) {
+
+  // Fixit: fix EOP type declaration
+  static async parse(reader: any, tabs: number, overread: any): Promise<'EOP' | MonoToken> {
     let line: string | null
     if (overread.readed) {
       line = overread.line
@@ -124,14 +57,14 @@ export class MonoBehaviour {
       overread.line = line
       return EOP
     }
-    
+
     const items = line.replace(/\t|\r/g, '').split(/\s+/)
-    
-    const propertyToken = this.getPropertyToken(items)
+
+    const propertyToken = this.getPropertyToken(line)
     if (propertyToken) {
       return propertyToken
     }
-    
+
     const objectToken = this.getObjectToken(items)
     // console.log('[object]', objectEntry)
     if (objectToken) {
@@ -140,14 +73,14 @@ export class MonoBehaviour {
         if (!next || next === EOP || next.type === 'array-index') {
           break;
         }
-        
-        if (next.key) {
+
+        if (next.key && !this.isExcludeToken(next)) {
           (objectToken.value as any)[next.key] = next
         }
       }
       return objectToken
     }
-    
+
     const arrayToken = this.getArrayToken(items)
     if (arrayToken) {
       const a1 = await reader.next()
@@ -161,28 +94,116 @@ export class MonoBehaviour {
         if (!next || next === EOP || next.type !== 'array-index') {
           break;
         }
-        
+
         const token = await this.parse(reader, tabs + 2, overread)
         if (!token || token === EOP || token.type === 'array-index') {
           break;
         }
-        (arrayToken.value as any[]).push(token)
+        if (!this.isEmptyObjectToken(token)) {
+          (arrayToken.value as MonoToken[]).push(token)
+        }
       }
       return arrayToken
     }
-    
+
     const arrayIndexToken = this.getArrayIndexToken(items)
     if (arrayIndexToken) {
       return arrayIndexToken
     }
-    
+
     console.log(chalk.red(`[ERROR] unknown line ${line}`))
-    return {
-      key: '',
-      type: 'null',
-      typeInMono: '',
-      value: null
-    } as MonoProperty
+    throw new Error(`Unable to parse ${line}`)
   }
+
+  private static getObjectToken(items: string[]): MonoToken | null {
+    if (items.length !== 2) {
+      return null
+    }
+
+    let mono: string = ''
+    let key: string = ''
+    if (items[0].match(/^(MonoBehaviour|PPtr<)/)) {
+      [mono, key] = items
+    }
+    else if (items[1].match(/^(dict|data)/)) {
+      [key, mono] = items
+    }
+    return !key ? null : {
+      key: this.normalizeKey(key),
+      type: 'object',
+      value: {},
+      mono
+    } as MonoToken
+  }
+
+  private static getArrayToken(items: string[]): MonoToken | null {
+    if (items.length !== 2) {
+      return null
+    }
+
+    let mono: string = ''
+    let key: string = ''
+    if (items[0].match(/^(vector)/)) {
+      [mono, key] = items
+    }
+    else if (items[1].match(/^(list|entriesValue)/)) {
+      [key, mono] = items
+    }
+    return !key ? null : {
+      key: this.normalizeKey(key),
+      type: 'array',
+      value: [],
+      mono
+    } as MonoToken
+  }
+
+  static getArrayIndexToken(items: string[]): MonoToken | null {
+    if (items.length !== 1) {
+      return null
+    }
+
+    if (items[0].match(/^(\[\d+\])/)) {
+      return {
+        type: 'array-index',
+        value: items[0].replace(/\[|\]/g, ''),
+        mono: '',
+        key: ''
+      } as MonoToken
+    }
+    else {
+      return null
+    }
+  }
+
+  private static getPropertyToken(line: string): MonoToken | null {
+    const matched = line.match(/^\t*(string|int|UInt8|SInt64|float) (\w+) = (["-\w]+)/)
+    if (!matched) {
+      return null
+    }
+
+    const value: string = matched[3].replace(/\r/g, '')
+    const token: MonoToken = {
+      key:  this.normalizeKey(matched[2]),
+      mono: matched[1],
+      type: 'number',
+      value: 0
+    }
+
+    if (token.mono.match(/^(string)/)) {
+      token.type = 'string'
+      token.value = value.replace(/(^")|("$)/g, '')
+    }
+    else if (token.mono.match(/^(int|UInt8|SInt64)/)) {
+      token.value = parseInt(value, 10)
+    }
+    else if (token.mono.match(/^(float)/)) {
+      token.value = parseFloat(value)
+    }
+    else {
+      return null
+    }
+    return token
+  }
+
 }
 

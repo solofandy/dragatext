@@ -1,6 +1,9 @@
 package-lock.json
 node_modules
 
+output/*/*.schema
+output/*/*.json
+output/*/*.bson
 resources/master
 resources/story
 /test*
