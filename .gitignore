@@ -4,6 +4,7 @@ node_modules
 output/*/*.schema
 output/*/*.json
 output/*/*.bson
+output/*/*.ts
 resources/master
 resources/story
 /test*

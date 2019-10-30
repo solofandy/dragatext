@@ -47,6 +47,37 @@ export const generateMonoSchema = (token: MonoToken, onArrayCut?: any): MonoToke
   }
 }
 
+export const generateMonoTs = (token: MonoToken, types: any): any => {
+  switch (token.type) {
+    case 'object': {
+      const value: { [name: string]: MonoToken } = token.value as { [name: string]: MonoToken }
+      if (token.mono === 'data') {
+        let result = [`class ${token.key} {`]
+        for (const key in value) {
+          const prop = value[key]
+          result.push(`  ${prop.key}: ${prop.type} = ${prop.type === 'number' ? '0' : (prop.type === 'string' ? "''" : 'null')};`)
+        }
+        result.push('}')
+        result.push('')
+        types[token.key] = result.join('\n')
+      }
+      
+      for (const key in value) {
+        generateMonoTs(value[key], types)
+      }
+    }
+    
+    case 'array': {
+      const result: any[] = []
+      const value: MonoToken[] = token.value as MonoToken[]
+      if (value.length > 0) {
+        generateMonoTs(value[0], types)
+      }
+    }
+  }
+}
+
+
 export const generateMonoJson = (token: MonoToken): any => {
   switch (token.type) {
     case 'object': {

@@ -2,22 +2,24 @@ import chalk from 'chalk'
 import nexline from 'nexline'
 import * as fs from 'fs'
 import { MonoBehaviour } from '../mono/parser'
-import { generateMonoSchema, generateMonoJson, MonoToken, EOP } from '../mono/mono'
-import { saveBson, saveJson, listDirectory, fielExists } from '../helper/helper'
-import { inputPath, schemaPath, jsonPath, bsonPath } from '../../config'
+import { generateMonoSchema, generateMonoJson, MonoToken, EOP, generateMonoTs } from '../mono/mono'
+import { saveBson, saveJson, listDirectory, fielExists, saveTo } from '../helper/helper'
+import { inputPath, schemaPath, jsonPath, bsonPath, tsPath } from '../../config'
 import { basename } from 'path'
 
 const option = {
   // dryRun: process.argv.includes('--dry-run') || false,
   only: process.argv.includes('--only') || false,
-  saveJson: process.argv.includes('--save-json') || true,
+  saveTs: !process.argv.includes('--no-save-ts'),
+  saveJson: !process.argv.includes('--no-save-json'),
   saveBson: process.argv.includes('--save-bson') || false,
-  saveSchema: process.argv.includes('--save-schema') || true
+  saveSchema: !process.argv.includes('--no-save-schema')
 }
 
 const input = 'resources/master/AbilityData.txt'
 
 async function boot() {
+  const tsHolder = tsPath
   const jsonHolder = jsonPath
   const bsonHolder = bsonPath
   const inputHolder = inputPath
@@ -45,6 +47,19 @@ async function boot() {
       }
       if (option.saveBson) {
         await saveBson(json, `${bsonHolder}/${filebase.replace(/\..*$/, '.bson')}`)
+      }
+    }
+    
+    if (option.saveTs) {
+      const types = {}
+      generateMonoTs(token, types);
+      for (const key in types) {
+        const tsFile = `${tsHolder}/${key.toLowerCase()}.ts`
+        // if (await fielExists(tsFile)) {
+        //   console.log(chalk.red(`${tsFile} exists`))
+        // }
+        await saveTo(types[key], tsFile)
+        console.log(`\tts ${chalk.green(tsFile)} saved`)
       }
     }
 
