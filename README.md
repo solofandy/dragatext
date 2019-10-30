@@ -2,7 +2,7 @@
 
 ### install
 ```
-git clone https://github.com/solofandy/dlsim-vue/blob/master/README.md  or download a copy
+git clone `project`  or  download a copy
 npm install
 ```
 
