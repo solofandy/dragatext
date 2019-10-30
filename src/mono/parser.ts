@@ -176,7 +176,7 @@ export class MonoBehaviour {
   }
 
   private static getPropertyToken(line: string): MonoToken | null {
-    const matched = line.match(/^\t*(string|int|UInt8|SInt64|float) (\w+) = (["-\w]+)/)
+    const matched = line.match(/^\t*(string|int|UInt8|SInt64|float) (\w+) = (.+)\r$/)
     if (!matched) {
       return null
     }

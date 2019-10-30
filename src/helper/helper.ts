@@ -1,5 +1,5 @@
 import * as BSON from 'bson'
-import { writeFile, readdir } from 'fs'
+import { writeFile, readdir, stat } from 'fs'
 
 export const saveJson = async (json: any, fileName: string) => {
   return new Promise((resolve, reject) => {
@@ -32,6 +32,18 @@ export const listDirectory = async (path: string): Promise<string[]> => {
         reject(err)
       } else {
         resolve(items)
+      }
+    })
+  })
+}
+
+export const fielExists = async (path: string): Promise<boolean> => {
+  return new Promise((resolve: Function, reject: Function) => {
+    stat(path, (err, stats) => {
+      if (err) {
+        resolve(false)
+      } else {
+        resolve(stats.isFile())
       }
     })
   })
