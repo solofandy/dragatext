@@ -16,6 +16,14 @@ const EXCLUDE_TOKEN = [
 ]
 
 export class MonoBehaviour {
+  
+  private static countTabs(line: string | null) {
+    if (!line) {
+      return 0
+    }
+    const matched = line.match(/^(\t*)/)
+    return matched ? matched[1].length : 0
+  }
 
   private static isExcludeToken(token: MonoToken): boolean {
     return !!EXCLUDE_TOKEN.find(exclude => {
@@ -52,7 +60,9 @@ export class MonoBehaviour {
     else {
       line = await reader.next()
     }
-    if (!line || (line.match(/\t/g) || []).length !== tabs + 1) {
+    const thisTabs = this.countTabs(line)
+    
+    if (!line || (thisTabs!== tabs + 1)) {
       overread.readed = true
       overread.line = line
       return EOP
