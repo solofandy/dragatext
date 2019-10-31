@@ -2,12 +2,12 @@ package-lock.json
 node_modules
 *.sqlite-journal
 
-output/*/*.sqlite
-output/*/*.schema
-output/*/*.json
-output/*/*.bson
-output/*/*.sql
-output/*/*.ts
+output/**/*.sqlite
+output/**/*.schema
+output/**/*.json
+output/**/*.bson
+output/**/*.sql
+output/**/*.ts
 resources/master
 resources/story
 /test*

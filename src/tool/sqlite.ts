@@ -9,6 +9,7 @@ import { inputPath, dbPath } from '../../config'
 import { basename } from 'path'
 import { DB_WHITE_LIST, TEXT_LABEL_TXT } from '../../should-parse-to-db'
 
+const DB_FILE = 'output/db/dragatext.sqlite'
 const WHITE_LIST: string[] = DB_WHITE_LIST || []
 
 const option = {
@@ -32,9 +33,9 @@ async function parseText(file: string) {
   return token;
 }
 
-async function dbOpen (): Promise<sqlite3.Database> {
+async function dbOpen (file: string): Promise<sqlite3.Database> {
   return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database('output/db.sqlite', (err) => {
+    const db = new sqlite3.Database(file, (err) => {
       if (err) {
         return reject(err)
       }
@@ -173,7 +174,7 @@ async function boot () {
     }
 
     db = {}
-    SQLITE = await dbOpen()
+    SQLITE = await dbOpen(DB_FILE)
     // create table
     await traversalOnMonoData(token, createSqlTable)
     if (Object.keys(db).length > 1) {
@@ -189,7 +190,6 @@ async function boot () {
         console.log(chalk.bold(db[key].sql))
         console.log(chalk.red(e))
       }
-      return true
     }
 
     // insert into
