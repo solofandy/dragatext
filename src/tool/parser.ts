@@ -16,8 +16,6 @@ const option = {
   saveSchema: !process.argv.includes('--no-save-schema')
 }
 
-const input = 'resources/master/AbilityData.txt'
-
 async function boot() {
   const tsHolder = tsPath
   const jsonHolder = jsonPath
@@ -27,7 +25,7 @@ async function boot() {
 
   const parseText = async (file: string) => {
     console.log(`\nprocessing ${chalk.greenBright(file)} ...`)
-    const filebase = basename(file)
+    const filebase = basename(file).toLowerCase()
     const fd = fs.openSync(file, 'r')
     const reader = nexline({input: fd})
     const token = await MonoBehaviour.parse(reader, -1, {})
@@ -49,7 +47,7 @@ async function boot() {
         await saveBson(json, `${bsonHolder}/${filebase.replace(/\..*$/, '.bson')}`)
       }
     }
-    
+
     if (option.saveTs) {
       const types = {}
       generateMonoTs(token, types);
@@ -74,7 +72,6 @@ async function boot() {
     }
   }
 
-  const files = await listDirectory(inputHolder)
   if (option.only) {
     for (let index = 2; index < process.argv.length; index++) {
       if (await fielExists(process.argv[index])) {
@@ -83,6 +80,7 @@ async function boot() {
     }
   }
   else {
+    const files = await listDirectory(inputHolder)
     for (const file of files) {
       await parseText(`${inputHolder}/${file}`)
     }

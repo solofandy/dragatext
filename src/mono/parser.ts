@@ -11,8 +11,8 @@ const EXCLUDE_TOKEN = [
   { mono: /^UInt8/, key: /^Enabled/ },
   { mono: /^PPtr</, key: /^Script/ },
 
-  { mono: /^int</, key: /^freeCount/ },
-  { mono: /^int</, key: /^freeList/ }
+  { mono: /^int/, key: /^freeCount/ },
+  { mono: /^int/, key: /^freeList/ }
 ]
 
 export class MonoBehaviour {
