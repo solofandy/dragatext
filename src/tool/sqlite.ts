@@ -2,8 +2,8 @@ import chalk from 'chalk'
 import nexline from 'nexline'
 import * as fs from 'fs'
 import sqlite3 from 'sqlite3'
-import { MonoBehaviour } from '../mono/parser'
-import { MonoToken, EOP, traversalOnMonoData } from '../mono/mono'
+import { MonoBehaviourText, traversalOnMonoData, MonoTokenType, MonoObjectToken } from '../mono'
+import { MonoToken } from '../mono'
 import { listDirectory, fielExists, saveTo } from '../helper/helper'
 import { inputPath, dbPath } from '../../config'
 import { basename } from 'path'
@@ -16,86 +16,102 @@ const option = {
   only: process.argv.includes('--only') || false
 }
 
+const labels: any = {}
+
+class Sqlite {
+  
+  dbFile: string
+  DB: sqlite3.Database | null
+  
+  constructor(dbFile: string) {
+    this.DB = null
+    this.dbFile = dbFile
+  }
+  
+  async open(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      const db = new sqlite3.Database(this.dbFile, (err) => {
+        if (err) {
+          return resolve(false)
+        }
+        this.DB = db
+        resolve(true)
+      })
+    })
+  }
+  
+  async run (sql: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!this.DB) {
+        return reject(new Error('Should open db first'))
+      }
+      this.DB.run(sql, err => {
+        err ? resolve(false) : resolve(true)
+      })
+    })
+  }
+  
+  async close(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!this.DB) {
+        return reject(new Error('Should open db first'))
+      }
+      this.DB.close(err => {
+        if (err){
+          return resolve(false)
+        }
+        this.DB = null
+        resolve(true)
+      })
+    })
+  }
+}
+
 const dbHolder = dbPath
 const inputHolder = inputPath
 
-async function parseText(file: string) {
+const parseText = async (file: string) => {
   console.log(`\nprocessing ${chalk.green(file)} ...`)
-  const filebase = basename(file).toLowerCase()
   const fd = fs.openSync(file, 'r')
   const reader = nexline({input: fd})
-  const token = await MonoBehaviour.parse(reader, -1, {})
+  const token = await MonoBehaviourText.parse(reader, 0, -1, {})
   fs.closeSync(fd)
-
-  if (token === EOP) {
-    console.log(chalk.red(`[ERROR] file ${file} is empty`))
-  }
   return token;
 }
 
-async function dbOpen (file: string): Promise<sqlite3.Database> {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(file, (err) => {
-      if (err) {
-        return reject(err)
-      }
-      resolve(db)
-    })
-  })
+const storeLabel = async (token: MonoToken): Promise<any> => {
+  const value: { [name: string]: MonoToken } = token.value as { [name: string]: MonoToken }
+  if ('Id' in value && 'Text' in value) {
+    const id = value['Id'].value as string
+    if (id in labels) {
+      console.log(chalk.bold(`label ${id} exists`))
+    }
+    labels[id] = value['Text'].value as string
+  }
 }
 
-async function dbClose (DB: sqlite3.Database) {
-  return new Promise((resolve, reject) => {
-    DB.close(err => {
-      err ? reject(err) : resolve(true)
-    })
-  })
+const getLabel = (textId: string): string => {
+  return textId in labels ? labels[textId] : textId
 }
 
-async function dbRun (DB: sqlite3.Database, sql: string) {
-  return new Promise((resolve, reject) => {
-    DB.run(sql, err => {
-      err ? reject(err) : resolve(true)
-    })
-  })
-}
 
 async function boot () {
+  let tables: any = {}
+  const db: Sqlite = new Sqlite(DB_FILE)
 
-  const labels: any = {}
-
-  let db: any
-  let SQLITE: sqlite3.Database
-
-  const storeLabel = async (token: MonoToken): Promise<any> => {
-    const value: { [name: string]: MonoToken } = token.value as { [name: string]: MonoToken }
-    if ('Id' in value && 'Text' in value) {
-      const id = value['Id'].value as string
-      if (id in labels) {
-        console.log(chalk.bold(`label ${id} exists`))
-      }
-      labels[id] = value['Text'].value as string
-    }
+  const processTextLabel = async (token: MonoToken) => {
+    
   }
 
-  const processTextLabel = async (token: MonoToken | 'EOP') => {
-    if (token === EOP) {
-      return ;
-    }
-
-    traversalOnMonoData(token, storeLabel)
-    console.log(chalk.green(`text label parsed`))
-  }
-
-  const getLabel = (textId: string): string => {
-    return textId in labels ? labels[textId] : textId
-  }
-
+  
   const createSqlTable = async (token: MonoToken): Promise<any> => {
-    const value: { [name: string]: MonoToken } = token.value as { [name: string]: MonoToken }
+    const value = (token as MonoObjectToken).value
     for (const key in value) {
       const child = value[key]
-      if (child.type !== 'number' && child.type !== 'string') {
+      if (child.type !== MonoTokenType.STRING && 
+          child.type !== MonoTokenType.NUMBER &&
+          child.type !== MonoTokenType.FLOAT
+        ) {
         console.log(chalk.red(`[ERROR] invalid data element ${token.key}`))
         return false;
       }
@@ -114,8 +130,9 @@ async function boot () {
     sql[sql.length - 1] = sql[sql.length - 1].replace(/,$/, '')
     sql.push(');')
     sql.push('')
-    if (!(name in db)) {
-      db[name] = {
+    
+    if (!(name in tables)) {
+      tables[name] = {
         name: name,
         columns: column,
         sql: sql.join('\n')
@@ -126,7 +143,7 @@ async function boot () {
 
   const insertEntityData = async (token: MonoToken): Promise<any> => {
     const name = token.key.replace(/Element$/, '')
-    const table = db[name]
+    const table = tables[name]
     if (!table) {
       return false;
     }
@@ -136,7 +153,7 @@ async function boot () {
       return false;
     }
 
-    const value: { [name: string]: MonoToken } = token.value as { [name: string]: MonoToken }
+    const value = (token as MonoObjectToken).value
     const failed = table.columns.find((col: string) => {
       return !(col in value) ||
              (value[col].type !== 'string' &&
@@ -146,7 +163,7 @@ async function boot () {
       return
     }
 
-    const id = value['Id']
+    // const id = value['Id']
     const cols = table.columns.map(col => `"${col}"`)
     const vals = table.columns.map(col => (value[col].type === 'string') ? `"${getLabel(value[col].value as string)}"` : `${value[col].value}`)
 
@@ -160,7 +177,7 @@ async function boot () {
 
     // console.log(chalk.bold(sql))
     try {
-      await dbRun(SQLITE, sql)
+      await db.run(sql)
     } catch(e) {
       console.log(chalk.bold(sql))
       console.log(chalk.red(e))
@@ -168,13 +185,11 @@ async function boot () {
     return true
   }
 
-  const processToken = async (token: MonoToken | 'EOP') => {
-    if (token === EOP) {
-      return ;
-    }
+  const processToken = async (token: MonoToken) => {
 
-    db = {}
-    SQLITE = await dbOpen(DB_FILE)
+    tables = {}
+    await db.open()
+    
     // create table
     await traversalOnMonoData(token, createSqlTable)
     if (Object.keys(db).length > 1) {
@@ -185,22 +200,23 @@ async function boot () {
       const tableFile = `${dbHolder}/table/${key}.sql`
       await saveTo(db[key].sql, tableFile)
       try {
-        await dbRun(SQLITE, db[key].sql)
+        await db.run(db[key].sql)
       } catch(e) {
         console.log(chalk.bold(db[key].sql))
-        console.log(chalk.red(e))
+        console.log(chalk.red(e, e.stack))
       }
     }
 
     // insert into
     traversalOnMonoData(token, insertEntityData)
 
-    await dbClose(SQLITE)
+    await db.close()
   }
 
-  await processTextLabel(
-    await parseText(`${inputHolder}/${TEXT_LABEL_TXT}`)
-  )
+  // prepare text labels
+  const labelToken = await await parseText(`${inputHolder}/${TEXT_LABEL_TXT}`);
+  await traversalOnMonoData(labelToken, storeLabel)
+  console.log(chalk.green(`text label parsed`))
 
   if (option.only) {
     for (let index = 2; index < process.argv.length; index++) {

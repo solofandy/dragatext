@@ -110,6 +110,66 @@ export class MonoBehaviourText {
     }
     return true
   }
+  
+  static async parse(reader: any, lines: number, tabs: number, overread: any): Promise<MonoToken> {
+    let line: string | null
+    if (overread.readed) {
+      line = overread.line
+      overread.line = ''
+      overread.readed = false
+    }
+    else {
+      line = await reader.next()
+      lines += 1
+    }
+    const token = this.parseToken(line, lines)
+    const thisTabs = this.getTabs(line)
+    
+    if (token.type === MonoTokenType.NULL || (thisTabs!== tabs + 1)) {
+      overread.readed = true
+      overread.line = line
+      return monoEndToken
+    }
+    
+    if (token.type === MonoTokenType.OBJECT) {
+      const excludeMe = this.isExcludeToken(token)
+      while (true) {
+        const next = await this.parse(reader, lines, tabs + 1, overread)
+        if (next.type === MonoTokenType.NULL || next.type === MonoTokenType.ARRAY_INDEX) {
+          break;
+        }
+
+        if (!excludeMe && next.key && !this.isExcludeToken(next)) {
+          (token as MonoObjectToken).value[next.key] = next
+        }
+      }
+    }
+    else if (token.type === MonoTokenType.ARRAY) {
+      const excludeMe = this.isExcludeToken(token)
+      const line1 = await reader.next()
+      const line2 = await reader.next()
+      if (!line1.match(/Array Array/) || !line2.match(/int size = \d+/)) {
+        console.log(chalk.red(`[ERROR] array token: ${line} ${line1} ${line2}`))
+      }
+      // TODO:
+      while (true) {
+        const next = await this.parse(reader, lines + 2, tabs + 2, overread)
+        if (next.type !== MonoTokenType.ARRAY_INDEX) {
+          break;
+        }
+
+        const child = await this.parse(reader, lines + 2, tabs + 2, overread)
+        if (child.type === MonoTokenType.NULL || child.type === MonoTokenType.ARRAY_INDEX)  {
+          break;
+        }
+        if (!excludeMe && !this.isEmptyObjectToken(child)) {
+          (child as MonoArrayToken).value.push(child)
+        }
+      }
+    }
+    
+    return token
+  }
 
   static async traversal(reader: any, onTokenParseStart?: OnTokenParsed, onTokenParseEnd?: OnTokenParsed): Promise<any> {
     const stack: MonoTraversalStack = {
@@ -199,7 +259,10 @@ export class MonoBehaviourText {
     return key.replace(/^m?_/, '')
   }
   
-  static getTabs(line: string): number {
+  static getTabs(line: string | null): number {
+    if (!line) {
+      return 0
+    }
     const matched = line.match(/^(\t*)/)
     return matched ? matched[1].length : 0
   }
