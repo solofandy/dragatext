@@ -93,6 +93,10 @@ const EXCLUDE_TOKEN = [
 
 export class MonoBehaviourText {
 
+  static isPropertyToken(token: MonoToken): boolean {
+    return [MonoTokenType.NUMBER, MonoTokenType.FLOAT, MonoTokenType.STRING].includes(token.type)
+  }
+
   static isExcludeToken(token: MonoToken): boolean {
     return !!EXCLUDE_TOKEN.find(exclude => {
       return token.key.match(exclude.key) && token.mono.match(exclude.mono)
@@ -110,7 +114,7 @@ export class MonoBehaviourText {
     }
     return true
   }
-  
+
   static async parse(reader: any, lines: number, tabs: number, overread: any): Promise<MonoToken> {
     let line: string | null
     if (overread.readed) {
@@ -124,13 +128,13 @@ export class MonoBehaviourText {
     }
     const token = this.parseToken(line, lines)
     const thisTabs = this.getTabs(line)
-    
+
     if (token.type === MonoTokenType.NULL || (thisTabs!== tabs + 1)) {
       overread.readed = true
       overread.line = line
       return monoEndToken
     }
-    
+
     if (token.type === MonoTokenType.OBJECT) {
       const excludeMe = this.isExcludeToken(token)
       while (true) {
@@ -163,11 +167,11 @@ export class MonoBehaviourText {
           break;
         }
         if (!excludeMe && !this.isEmptyObjectToken(child)) {
-          (child as MonoArrayToken).value.push(child)
+          (token as MonoArrayToken).value.push(child)
         }
       }
     }
-    
+
     return token
   }
 
@@ -177,25 +181,25 @@ export class MonoBehaviourText {
       lines: 0,
       tokens: [monoEndToken]
     }
-    
+
     const top = (): MonoToken => {
       return stack.tokens[stack.top]
     }
-    
+
     const pop = async () => {
-      // TODO: token full parsed 
+      // TODO: token full parsed
       if (onTokenParseEnd instanceof Function) {
         await onTokenParseEnd(top(), stack)
       }
       delete stack.tokens[stack.top]
       stack.top -= 1
     }
-    
+
     const push = (token: MonoToken) => {
       stack.top += 1
       stack.tokens[stack.top] = token
     }
-    
+
     try {
       while (true) {
         stack.lines += 1
@@ -203,21 +207,21 @@ export class MonoBehaviourText {
         if (stack.lines % 10000 == 0) {
           console.log(chalk.bold(`#${stack.lines}`))
         }
-        
+
         const token = this.parseToken(line, stack.lines)
         while (stack.top > 0 && token.tabs <= top().tabs) {
           await pop()
         }
-        
+
         push(token)
         if (onTokenParseStart instanceof Function) {
           await onTokenParseStart(token, stack)
         }
-        
+
         if (token.type === MonoTokenType.NULL) {
           break;
         }
-        
+
         // array type tunning start
         if (token.type === MonoTokenType.ARRAY) {
           const line1 = await reader.next()
@@ -240,25 +244,25 @@ export class MonoBehaviourText {
     if (!line) {
       return monoEndToken
     }
-    
-    let token = 
+
+    let token =
       this.parseNumberToken(line, lines) ||
       this.parseStringToken(line, lines) ||
       this.parseObjectToken(line, lines) ||
       this.parseFloatToken(line, lines) ||
       this.parseArrayToken(line, lines) ||
       this.parseArrayIndexToken(line, lines)
-      
+
     if (!token) {
       throw new Error(`Unknown line, #${lines} ${line}`)
     }
     return token
   }
-  
+
   private static normalizeKey(key: string): string {
     return key.replace(/^m?_/, '')
   }
-  
+
   static getTabs(line: string | null): number {
     if (!line) {
       return 0
@@ -266,7 +270,7 @@ export class MonoBehaviourText {
     const matched = line.match(/^(\t*)/)
     return matched ? matched[1].length : 0
   }
-  
+
   private static parseStringToken(line: string, lines: number): MonoStringToken | null {
     const matched = line.match(/^\t*(string) (\w+) = (.+)\r$/)
     if (!matched) {
@@ -284,7 +288,7 @@ export class MonoBehaviourText {
       value: value.replace(/(^")|("$)/g, '')
     } as MonoStringToken
   }
-  
+
   private static parseNumberToken(line: string, lines: number): MonoNumberToken | null {
     const matched = line.match(/^\t*(int|UInt8|SInt64) (\w+) = (.+)\r$/)
     if (!matched) {
@@ -302,7 +306,7 @@ export class MonoBehaviourText {
       value: parseInt(value, 10)
     } as MonoNumberToken
   }
-  
+
   private static parseFloatToken(line: string, lines: number): MonoFloatToken | null {
     const matched = line.match(/^\t*(float) (\w+) = (.+)\r$/)
     if (!matched) {
@@ -320,7 +324,7 @@ export class MonoBehaviourText {
       value: parseFloat(value)
     } as MonoFloatToken
   }
-  
+
   private static parseObjectToken(line: string, lines: number): MonoObjectToken | null {
     const items = line.replace(/\t|\r/g, '').split(/\s+/)
     if (items.length !== 2) {
@@ -376,7 +380,7 @@ export class MonoBehaviourText {
     if (items.length !== 1) {
       return null
     }
-    
+
     const matched = items[0].match(/^\[(\d+)\]/)
     return (!matched) ? null : {
       key:  '',

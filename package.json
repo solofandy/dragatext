@@ -11,14 +11,11 @@
   "dependencies": {
     "bson": "4.0.2",
     "chalk": "2.4.2",
-    "nexline": "1.1.0",
-    "sql.js": "^1.0.0",
-    "typeorm": "^0.2.20"
+    "nexline": "1.1.0"
   },
   "devDependencies": {
     "@types/bson": "4.0.0",
     "@types/node": "12.11.7",
-    "@types/sql.js": "^1.0.2",
     "@types/sqlite3": "^3.1.5",
     "sqlite3": "^4.1.0",
     "ts-node": "8.4.1",
