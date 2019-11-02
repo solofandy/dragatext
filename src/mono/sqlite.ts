@@ -56,12 +56,19 @@ export class Sqlite {
     const orm: string[] = []
     const name = objectToken.key.replace(/Element$/, '')
 
-    orm.push(`import { Entity, Column, PrimaryColumn } from "typeorm"`)
+    orm.push(`import { MonoEntity } from './MonoEntity'`)
+    orm.push(`import { Entity, Column, PrimaryColumn } from 'typeorm'`)
     orm.push(``)
     orm.push(`@Entity({`)
     orm.push(`  name: '${name}'`)
     orm.push(`})`)
-    orm.push(`export class ${name} \{`)
+    orm.push(`export class ${name} extends MonoEntity \{`)
+    orm.push(``)
+    orm.push(`  static entity: string = '${name}'`)
+    orm.push(``)
+    orm.push(`// '${name}': { name: '${name}', columns: ${name}.columns, entity: ${name} },`)
+    orm.push(`  static columns: string[] = [${Object.keys(objectToken.value).map(name => `'${name}'`).join(', ')}]`)
+
     Object.values(objectToken.value).forEach(child => {
       const column = child.key.match(/^id$/i) ? '@PrimaryColumn()' : '@Column()'
       orm.push('')
@@ -78,7 +85,7 @@ export class Sqlite {
     return orm.join('\n')
   }
 
-  genInsertInto (table: MonoTable, objectToken: MonoObjectToken, labels: { [name: string]: string }): string {
+  genInsertInto (table: MonoTable, objectToken: MonoObjectToken, labels: { [name: string]: string }, replace?: boolean): string {
     if (
       table.columns.find(col => !(col in objectToken.value)) ||
       Object.values(objectToken.value).find(child => !MonoBehaviourText.isPropertyToken(child))
@@ -101,7 +108,8 @@ export class Sqlite {
           return `${children[col].value}`
       }
     })
-    return `INSERT OR REPLACE INTO "${table.name}" (${cols.join(', ')}) VALUES (${vals.join(', ')});`
+    const replaceCmd = replace ? 'OR REPLACE' : ''
+    return `INSERT ${replaceCmd} INTO "${table.name}" (${cols.join(', ')}) VALUES (${vals.join(', ')});`
   }
 
   async open(): Promise<boolean> {

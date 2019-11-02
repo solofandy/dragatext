@@ -1,16 +1,14 @@
 import chalk from 'chalk'
 import nexline from 'nexline'
 import * as fs from 'fs'
-import sqlite3 from 'sqlite3'
-import { MonoBehaviourText, traversalOnMonoData, MonoTokenType, MonoObjectToken, Sqlite, MonoTable } from '../mono'
+import { MonoBehaviourText, traversalOnMonoData, MonoObjectToken, Sqlite, MonoTable } from '../mono'
 import { MonoToken } from '../mono'
 import { listDirectory, fielExists, saveTo, saveJson, loadJson } from '../helper/helper'
 import { inputPath, tsPath, dbPath } from '../../config'
-import { basename } from 'path'
 import { DB_WHITE_LIST, TEXT_LABEL_TXT } from '../../should-parse-to-db'
 
 const DB_FILE = 'output/db/dragatext.sqlite'
-const WHITE_LIST: string[] = DB_WHITE_LIST || []
+const WHITE_LIST: Array<string|RegExp> = DB_WHITE_LIST || []
 const option = {
   only: process.argv.includes('--only') || false,
   noDB: process.argv.includes('--no-db')
@@ -146,7 +144,7 @@ async function boot () {
   else {
     const files = await listDirectory(inputHolder)
     for (const file of files) {
-      if (!WHITE_LIST.includes(file.toLocaleLowerCase())) {
+      if (!WHITE_LIST.find(cond => file.match(cond))) {
         continue
       }
 
