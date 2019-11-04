@@ -1,3 +1,6 @@
 export const DB_WHITE_LIST: string[] = []
 
 export const TEXT_LABEL_TXT: string = 'the-text-label.txt'
+
+export const RELATIONS = {}
+  

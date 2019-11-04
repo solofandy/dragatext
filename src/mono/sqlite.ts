@@ -8,6 +8,16 @@ export interface MonoTable {
   columns: string[];
 }
 
+export type ForeignKeyRelation =  { 
+    [table: string]: {
+      [field: string] : {
+      relation: 'OnoToOne' | 'OneToMany' | 'ManyToOne';
+      to: string;
+      field?: string;
+    }
+    }
+}
+
 export class Sqlite {
 
   fileName: string
@@ -18,7 +28,7 @@ export class Sqlite {
     this.connection = null
   }
 
-  genCreateTable (objectToken: MonoObjectToken): MonoTable | null {
+  genCreateTable (objectToken: MonoObjectToken, relations: ForeignKeyRelation = {}): MonoTable | null {
     if (Object.values(objectToken.value).find(child => !MonoBehaviourText.isPropertyToken(child))) {
       return null
     }
@@ -36,6 +46,18 @@ export class Sqlite {
       sql.push(`    "${child.key}" ${types[child.type]}${primary},`)
       cols.push(child.key)
     })
+    
+    for(const t in relations) {
+      if (t !== name) {
+        continue
+      }
+      for(const key in relations[t]) {
+        if (!cols.includes(key)) {
+          continue
+        }
+        sql.push(`    FOREIGN KEY('${key}') REFERENCES ${relations[t][key].to}(${relations[t][key].field || 'Id'})`)
+      }
+    }
     sql[sql.length - 1] = sql[sql.length - 1].replace(/,$/, '')
     sql.push(');')
     sql.push('')

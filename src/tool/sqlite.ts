@@ -1,11 +1,11 @@
 import chalk from 'chalk'
 import nexline from 'nexline'
 import * as fs from 'fs'
-import { MonoBehaviourText, traversalOnMonoData, MonoObjectToken, Sqlite, MonoTable } from '../mono'
+import { MonoBehaviourText, traversalOnMonoData, MonoObjectToken, Sqlite, MonoTable, ForeignKeyRelation } from '../mono'
 import { MonoToken } from '../mono'
 import { listDirectory, fielExists, saveTo, saveJson, loadJson } from '../helper/helper'
 import { inputPath, tsPath, dbPath } from '../../config'
-import { DB_WHITE_LIST, TEXT_LABEL_TXT } from '../../should-parse-to-db'
+import { DB_WHITE_LIST, TEXT_LABEL_TXT, RELATIONS } from '../../should-parse-to-db'
 
 const DB_FILE = 'output/db/dragatext.sqlite'
 const WHITE_LIST: Array<string|RegExp> = DB_WHITE_LIST || []
@@ -50,7 +50,7 @@ const createSqlTable = async (token: MonoToken): Promise<any> => {
   if (!token.key.match(/Element$/)) {
     return false
   }
-  const table = db.genCreateTable(token as MonoObjectToken)
+  const table = db.genCreateTable(token as MonoObjectToken, RELATIONS as ForeignKeyRelation)
   if (table) {
     tables[table.name] = table
   }
